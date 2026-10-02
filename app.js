@@ -1,6 +1,6 @@
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const STORAGE_KEY = 'cropguard.field-history.v1';
-const MODEL_URL = 'https://github.com/sachitsingh1431-del/cropguard-ai/releases/download/v1.0.0/model.onnx';
+const MODEL_URL = new URL('model.onnx', document.baseURI).href;
 const MODEL_CACHE_DB = 'cropguard-browser-models';
 const MODEL_CACHE_KEY = 'resnet50-field-adapted-v1';
 const MODEL_BYTES = 93_974_954;
