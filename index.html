@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#120f20" />
-    <meta name="description" content="CropGuard helps you inspect potato leaf health with an AI image check." />
+    <meta name="description" content="CropGuard offers an on-device first look at leaf conditions across 14 supported crop types." />
     <title>CropGuard — Plant health, decoded</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.min.js" defer></script>
-    <script src="app.js?v=2" defer></script>
+    <script src="app.js?v=3" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -44,7 +44,7 @@
         <div class="sidebar-bottom">
           <div class="field-card">
             <div class="field-card-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20c-5-2.7-7-6.8-5.1-12.5C12.5 6.8 16.7 8.8 19.5 14c-1.4 3.9-3.8 6-7.5 6Z"/><path d="M8.5 9.5c2.9 2.6 5.2 5.4 6.9 8.8"/></svg></div>
-            <div><strong>Made for the field</strong><span>Potato leaf insights</span></div>
+            <div><strong>Made for the field</strong><span>14 supported crop types</span></div>
             <span class="field-card-spark" aria-hidden="true">✳</span>
           </div>
           <div class="account-row">
@@ -71,7 +71,7 @@
             <div class="welcome-copy">
               <div class="eyebrow"><span class="eyebrow-line"></span> YOUR PLANT HEALTH COMPANION</div>
               <h1 id="welcome-title">A clearer view<br />of every <span>leaf.</span></h1>
-              <p>Get an AI-powered first look at potato leaf health. Snap a photo, upload it, and see what to look for next.</p>
+              <p>Get an on-device first look at supported crop leaves. Add a photo to explore a possible condition and what to inspect next.</p>
               <a class="text-link" href="#how-it-works">Get to know CropGuard <span aria-hidden="true">↗</span></a>
             </div>
             <div class="hero-art" aria-hidden="true">
@@ -97,7 +97,7 @@
 
             <div class="scan-grid">
               <div class="upload-card">
-                <div class="upload-card-top"><div><h3>Choose a potato leaf</h3><p>Use a clear photo with the affected area in focus.</p></div><span class="upload-card-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20c-5-2.7-7-6.8-5.1-12.5C12.5 6.8 16.7 8.8 19.5 14c-1.4 3.9-3.8 6-7.5 6Z"/><path d="M8.5 9.5c2.9 2.6 5.2 5.4 6.9 8.8"/></svg></span></div>
+                <div class="upload-card-top"><div><h3>Choose a supported crop leaf</h3><p>Use a clear photo with the affected area in focus.</p></div><span class="upload-card-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20c-5-2.7-7-6.8-5.1-12.5C12.5 6.8 16.7 8.8 19.5 14c-1.4 3.9-3.8 6-7.5 6Z"/><path d="M8.5 9.5c2.9 2.6 5.2 5.4 6.9 8.8"/></svg></span></div>
                 <input id="file-input" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/bmp" />
                 <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Choose or drop a leaf image">
                   <div class="drop-content" id="drop-content">
@@ -106,8 +106,9 @@
                     <span>or <button id="browse-button" class="inline-button" type="button">browse files</button></span>
                     <small>JPG, PNG, WEBP · up to 12 MB</small>
                   </div>
-                  <div class="preview-wrap hidden" id="preview-wrap"><img id="image-preview" alt="Selected potato leaf preview" /><button id="remove-image" class="remove-image" type="button" aria-label="Remove selected image">×</button><div class="preview-caption"><span class="preview-file-icon">▧</span><span id="file-name">leaf-photo.jpg</span><span id="file-size"></span></div></div>
+                  <div class="preview-wrap hidden" id="preview-wrap"><img id="image-preview" alt="Selected plant leaf preview" /><button id="remove-image" class="remove-image" type="button" aria-label="Remove selected image">×</button><div class="preview-caption"><span class="preview-file-icon">▧</span><span id="file-name">leaf-photo.jpg</span><span id="file-size"></span></div></div>
                 </div>
+                <div class="crop-coverage-card"><div class="crop-coverage-heading"><strong>Supported crop library</strong><span id="crop-count">Loading crop coverage…</span></div><div class="crop-coverage" id="crop-coverage" aria-label="Supported crop types"></div><p>38 PlantVillage image classes across these crops. The model may still force an answer for unlisted plants or conditions.</p></div>
                 <div class="upload-footer"><div class="privacy-note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></svg> Your photo stays on this device; only the AI model is downloaded.</div><button class="primary-button" id="analyze-button" type="button" disabled><span>Analyze leaf</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div>
                 <p class="upload-error hidden" id="upload-error" role="alert"></p>
               </div>
@@ -115,13 +116,13 @@
               <div class="result-card" id="result-card" aria-live="polite">
                 <div class="result-empty" id="result-empty">
                   <div class="result-illustration"><div class="result-ring ring-a"></div><div class="result-ring ring-b"></div><div class="result-leaf"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 54C17 46 11 34 16 17 31 14 43 20 51 35 47 47 41 53 32 54Z"/><path d="M20 22c8 7 14 15 19 25M30 31l-9 1m17 5 8-3"/></svg></div></div>
-                  <div class="empty-copy"><span class="result-overline">YOUR RESULT, AT A GLANCE</span><h3>Insights will appear here</h3><p>Upload a clear photo of a potato leaf to get an AI-generated first look.</p></div>
+                  <div class="empty-copy"><span class="result-overline">YOUR RESULT, AT A GLANCE</span><h3>Insights will appear here</h3><p>Upload a clear photo of a supported crop leaf to get an AI-generated first look.</p></div>
                   <div class="result-footnote"><span class="tiny-spark">✳</span> A helpful starting point, not a diagnosis</div>
                 </div>
                 <div class="result-content hidden" id="result-content">
                   <div class="result-topline"><span class="result-overline">CROPGuard IMAGE CHECK</span><span class="result-complete"><i></i> Analysis complete</span></div>
                   <div class="result-main"><div><div class="result-label">BEST MATCH</div><h3 id="prediction-title">Early blight</h3><p id="prediction-description">A visual pattern to review with care.</p></div><div class="score-ring" id="score-ring"><span id="score-value">--%</span><small>model<br />score</small></div></div>
-                  <div class="probability-title"><span>Other possible matches</span><span class="score-info" title="Softmax scores are model outputs and may not match real-world accuracy.">ⓘ</span></div>
+                  <div class="probability-title"><span>Closest class matches</span><span class="score-info" title="Model scores are not calibrated probabilities and may not match real-world accuracy.">ⓘ</span></div>
                   <div class="probability-list" id="probability-list"></div>
                   <div class="result-advice"><span class="advice-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v3m0 11v3m8.5-8.5h-3m-11 0h-3m14.5-6-2.1 2.1m-7.8 7.8L6 18m12 0-2.1-2.1M8.1 8.1 6 6"/><circle cx="12" cy="12" r="4.5"/></svg></span><span id="advice-copy">Use this result as a starting point. Check the whole plant and ask a local crop specialist before treatment.</span></div>
                   <div class="result-bottom"><span id="result-time"></span><button id="scan-another" type="button" class="secondary-button">Scan another leaf</button></div>
@@ -129,7 +130,7 @@
                 <div class="result-loading hidden" id="result-loading"><div class="loading-mark"><span></span><span></span><span></span></div><h3>Looking closely…</h3><p>Comparing leaf patterns against the model.</p></div>
               </div>
             </div>
-            <div class="safety-line"><span class="safety-dot"></span><span><strong>Keep an expert in the loop.</strong> CropGuard is an experimental screening aid. It can be wrong; confirm disease and treatment decisions with a qualified local advisor.</span></div>
+            <div class="safety-line"><span class="safety-dot"></span><span><strong>Keep an expert in the loop.</strong> The model uses curated PlantVillage imagery and a separate field-photo adaptation for potato. Other crops have not been field-validated; confirm the crop and any disease with a qualified local advisor before treatment.</span></div>
           </section>
 
           <section class="history-section" id="history" aria-labelledby="history-title">
@@ -142,8 +143,8 @@
           <section class="how-section" id="how-it-works" aria-labelledby="how-title">
             <div class="how-heading"><div class="section-kicker">A LITTLE MORE CONTEXT</div><h2 id="how-title">How CropGuard works</h2><p>A simple image check to help you decide what to inspect next.</p></div>
             <div class="how-grid">
-              <article class="how-step"><span class="how-number">01</span><div class="how-icon purple-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-9Z"/><circle cx="12" cy="12" r="3.5"/><path d="m7 5 1-2h3l1 2"/></svg></div><h3>Take a clear photo</h3><p>Frame one potato leaf in good light. Keep symptoms and leaf edges in focus.</p></article>
-              <article class="how-step"><span class="how-number">02</span><div class="how-icon green-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20c-5-2.7-7-6.8-5.1-12.5C12.5 6.8 16.7 8.8 19.5 14c-1.4 3.9-3.8 6-7.5 6Z"/><path d="M8.5 9.5c2.9 2.6 5.2 5.4 6.9 8.8"/></svg></div><h3>Get a first look</h3><p>The model compares visual patterns with potato leaf classes it has learned.</p></article>
+              <article class="how-step"><span class="how-number">01</span><div class="how-icon purple-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-9Z"/><circle cx="12" cy="12" r="3.5"/><path d="m7 5 1-2h3l1 2"/></svg></div><h3>Take a clear photo</h3><p>Frame one supported crop leaf in good light. Keep symptoms and leaf edges in focus.</p></article>
+              <article class="how-step"><span class="how-number">02</span><div class="how-icon green-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20c-5-2.7-7-6.8-5.1-12.5C12.5 6.8 16.7 8.8 19.5 14c-1.4 3.9-3.8 6-7.5 6Z"/><path d="M8.5 9.5c2.9 2.6 5.2 5.4 6.9 8.8"/></svg></div><h3>Get a first look</h3><p>The model compares visual patterns with 38 labeled classes across 14 crop types.</p></article>
               <article class="how-step"><span class="how-number">03</span><div class="how-icon amber-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.2 3.2 7.7 7.5 9.5 4.3-1.8 7.5-5.3 7.5-9.5V6L12 3Z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Confirm before action</h3><p>Use the result to guide inspection—not to diagnose or choose a treatment on its own.</p></article>
             </div>
           </section>

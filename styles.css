@@ -124,6 +124,13 @@ h1 span { color: #b79aff; }
 .upload-card-mark svg { width: 20px; height: 20px; }
 .drop-zone { position: relative; min-height: 235px; display: grid; place-items: center; overflow: hidden; color: var(--muted); text-align: center; border: 1px dashed rgba(195,174,239,.26); border-radius: 11px; background: rgba(13,11,22,.36); outline: none; transition: border-color .2s, background .2s; }
 .drop-zone:hover, .drop-zone.dragging, .drop-zone:focus-visible { border-color: rgba(187,157,255,.75); background: rgba(157,121,230,.07); }
+.crop-coverage-card { margin-top: 13px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.022); }
+.crop-coverage-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.crop-coverage-heading strong { color: #e5dcf6; font-size: 11px; font-weight: 600; }
+.crop-coverage-heading span { color: var(--dim); font-size: 9px; text-align: right; }
+.crop-coverage { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.crop-chip { padding: 3px 7px; color: #d1c5ea; background: rgba(169,138,255,.075); border: 1px solid rgba(169,138,255,.11); border-radius: 99px; font-size: 9px; }
+.crop-coverage-card p { margin: 9px 0 0; color: var(--dim); font-size: 9px; line-height: 1.5; }
 .drop-content { display: flex; align-items: center; flex-direction: column; padding: 18px; }
 .upload-symbol { display: grid; place-items: center; width: 49px; height: 49px; margin: 0 0 12px; color: #c6adff; background: rgba(169,138,255,.11); border: 1px solid rgba(180,152,255,.1); border-radius: 15px; }
 .upload-symbol svg { width: 27px; height: 27px; }

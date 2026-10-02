@@ -1,31 +1,19 @@
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const STORAGE_KEY = 'cropguard.field-history.v1';
 const MODEL_URL = new URL('model.onnx', document.baseURI).href;
+const CLASS_MAP_URL = new URL('model-classes.json?v=3', document.baseURI).href;
 const MODEL_CACHE_DB = 'cropguard-browser-models';
-const MODEL_CACHE_KEY = 'resnet50-field-adapted-v1';
-const MODEL_BYTES = 93_974_954;
-const MODEL_SIZE_LABEL = `${Math.round(MODEL_BYTES / 1024 / 1024)} MB`;
 const IMAGE_SIZE = 224;
 const CHANNEL_MEAN = [0.485, 0.456, 0.406];
 const CHANNEL_STD = [0.229, 0.224, 0.225];
-
-const classLabels = {
-  Potato___Early_blight: 'Early blight',
-  Potato___Late_blight: 'Late blight',
-  Potato___healthy: 'Healthy leaf',
-};
-
-const descriptions = {
-  Potato___Early_blight: 'The image is most similar to the model’s early blight examples.',
-  Potato___Late_blight: 'The image is most similar to the model’s late blight examples.',
-  Potato___healthy: 'The image is most similar to the model’s healthy leaf examples.',
-};
-
-const advice = {
-  Potato___Early_blight: 'Look for spreading brown spots with defined rings, and check other leaves. Ask a local crop specialist to confirm before treatment.',
-  Potato___Late_blight: 'Check nearby leaves and stems for rapidly spreading dark lesions. Seek prompt confirmation from a local crop specialist.',
-  Potato___healthy: 'The model did not find a strong disease match in this image. Keep monitoring the plant and check more than one leaf.',
-};
+const modelMetadataPromise = fetch(CLASS_MAP_URL, { cache: 'force-cache' }).then(async (response) => {
+  if (!response.ok) throw new Error('Crop coverage information could not be loaded. Refresh and try again.');
+  const metadata = await response.json();
+  if (!Array.isArray(metadata.class_names) || metadata.class_names.length !== 38) {
+    throw new Error('The multi-crop model information is incomplete. Refresh and try again.');
+  }
+  return metadata;
+});
 
 const fileInput = document.querySelector('#file-input');
 const dropZone = document.querySelector('#drop-zone');
@@ -148,11 +136,11 @@ function openModelCache() {
   });
 }
 
-async function readCachedModel() {
+async function readCachedModel(cacheKey) {
   const database = await openModelCache();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction('models', 'readonly');
-    const request = transaction.objectStore('models').get(MODEL_CACHE_KEY);
+    const request = transaction.objectStore('models').get(cacheKey);
     request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error || new Error('Could not read the cached model.'));
     transaction.oncomplete = () => database.close();
@@ -160,32 +148,34 @@ async function readCachedModel() {
   });
 }
 
-async function cacheModel(bytes) {
+async function cacheModel(bytes, cacheKey) {
   const database = await openModelCache();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction('models', 'readwrite');
-    transaction.objectStore('models').put(bytes, MODEL_CACHE_KEY);
+    transaction.objectStore('models').put(bytes, cacheKey);
     transaction.oncomplete = () => { database.close(); resolve(); };
     transaction.onerror = () => { database.close(); reject(transaction.error); };
     transaction.onabort = () => { database.close(); reject(transaction.error); };
   });
 }
 
-async function fetchModelBytes() {
+async function fetchModelBytes(metadata) {
+  const cacheKey = `cropguard-${metadata.version}`;
   try {
-    const cached = await readCachedModel();
+    const cached = await readCachedModel(cacheKey);
     if (cached instanceof ArrayBuffer && cached.byteLength > 0) return new Uint8Array(cached);
   } catch {
     // Browser storage can be unavailable or full; inference can still use a fresh download.
   }
 
-  setApiStatus('', `Downloading AI model · ${MODEL_SIZE_LABEL} once`);
+  const sizeLabel = `${Math.round(metadata.model_bytes / 1024 / 1024)} MB`;
+  setApiStatus('', `Downloading AI model · ${sizeLabel} once`);
   const response = await fetch(MODEL_URL, { cache: 'force-cache' });
   if (!response.ok) throw new Error('Could not download the AI model. Check your connection and retry.');
   const bytes = await response.arrayBuffer();
   if (bytes.byteLength < 1_000_000) throw new Error('The AI model download was incomplete. Please retry.');
   try {
-    await cacheModel(bytes);
+    await cacheModel(bytes, cacheKey);
   } catch {
     // A storage quota failure should not prevent this scan.
   }
@@ -195,12 +185,13 @@ async function fetchModelBytes() {
 async function getModelSession() {
   if (!modelSessionPromise) {
     modelSessionPromise = (async () => {
+      const metadata = await modelMetadataPromise;
       if (!window.ort?.InferenceSession) {
         throw new Error('The browser AI runtime did not load. Refresh the page and try again.');
       }
       window.ort.env.wasm.numThreads = 1;
       window.ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/';
-      const bytes = await fetchModelBytes();
+      const bytes = await fetchModelBytes(metadata);
       setApiStatus('', 'Preparing the AI model on this device…');
       return window.ort.InferenceSession.create(bytes, {
         executionProviders: ['wasm'],
@@ -247,9 +238,13 @@ async function predictOnDevice(image) {
   const input = imageToTensor(image);
   const outputs = await session.run({ input });
   const scores = probabilitiesFromLogits(outputs.logits.data);
+  const metadata = await modelMetadataPromise;
+  if (scores.length !== metadata.class_names.length) {
+    throw new Error('The AI model and crop labels do not match. Refresh the page and retry.');
+  }
   const ranked = scores.map((probability, index) => ({
-    class_name: Object.keys(classLabels)[index],
-    display_name: Object.values(classLabels)[index],
+    class_name: metadata.class_names[index],
+    display_name: displayClass(metadata.class_names[index]),
     probability,
   })).sort((left, right) => right.probability - left.probability);
   const best = ranked[0];
@@ -257,15 +252,54 @@ async function predictOnDevice(image) {
     predicted_class: best.class_name,
     display_name: best.display_name,
     confidence: best.probability,
-    probabilities: ranked,
+    probabilities: ranked.slice(0, 5),
   };
 }
+
+function titleCase(value) {
+  return value.replace(/\b\w/g, (letter) => letter.toUpperCase()).replace(/\s+/g, ' ').trim();
+}
+
+function displayClass(className) {
+  const [rawCrop, ...rawCondition] = className.split('___');
+  const cropLabel = titleCase(rawCrop.replaceAll('_', ' '));
+  const cropAliases = {
+    'Corn (Maize)': 'Corn',
+    'Cherry (Including Sour)': 'Cherry',
+    'Pepper, Bell': 'Bell pepper',
+  };
+  const crop = cropAliases[cropLabel] || cropLabel;
+  const condition = rawCondition.join(' ').replaceAll('_', ' ')
+    .replace(/Haunglongbing/gi, 'Huanglongbing').replace(/\s+/g, ' ').trim();
+  const disease = /healthy/i.test(condition) ? 'Healthy' : titleCase(condition);
+  return `${crop} · ${disease}`;
+}
+
+function isHealthyClass(className) {
+  return /(^|___)healthy$/i.test(className);
+}
+
+function renderCropCoverage(classNames) {
+  const container = document.querySelector('#crop-coverage');
+  const crops = [...new Set(classNames.map((name) => displayClass(name).split(' · ')[0]))].sort();
+  document.querySelector('#crop-count').textContent = `${crops.length} crop types · ${classNames.length} conditions`;
+  container.replaceChildren(...crops.map((crop) => {
+    const chip = document.createElement('span');
+    chip.className = 'crop-chip';
+    chip.textContent = crop;
+    return chip;
+  }));
+}
+
+modelMetadataPromise.then((metadata) => renderCropCoverage(metadata.class_names)).catch(() => {
+  document.querySelector('#crop-count').textContent = 'Crop coverage is unavailable offline';
+});
 
 function appendProbabilityRow(item, index) {
   const row = document.createElement('div');
   row.className = 'probability-row';
   const name = document.createElement('span');
-  name.textContent = classLabels[item.class_name] || item.display_name || 'Other';
+  name.textContent = item.display_name || displayClass(item.class_name) || 'Other';
   const track = document.createElement('span');
   track.className = 'bar-track';
   const fill = document.createElement('span');
@@ -282,13 +316,15 @@ function appendProbabilityRow(item, index) {
 }
 
 function renderResult(data) {
-  const label = classLabels[data.predicted_class] || data.display_name || 'Result unavailable';
+  const label = data.display_name || displayClass(data.predicted_class) || 'Result unavailable';
   const confidence = Math.max(0, Math.min(1, Number(data.confidence) || 0));
   document.querySelector('#prediction-title').textContent = label;
-  document.querySelector('#prediction-description').textContent = descriptions[data.predicted_class] || 'Review this result with care.';
+  document.querySelector('#prediction-description').textContent = `Best visual match in the ${label.split(' · ')[0]} classes. Model scores can be uncertain.`;
   document.querySelector('#score-value').textContent = `${Math.round(confidence * 100)}%`;
   document.querySelector('#score-ring').style.background = `conic-gradient(#a98aff 0 ${confidence * 100}%, #594a73 ${confidence * 100}% 100%)`;
-  document.querySelector('#advice-copy').textContent = advice[data.predicted_class] || 'Ask a local crop specialist to confirm what you see before treatment.';
+  document.querySelector('#advice-copy').textContent = isHealthyClass(data.predicted_class)
+    ? 'No listed disease class matched strongly. This does not guarantee the plant is disease-free; keep monitoring and check the whole plant.'
+    : 'Inspect several leaves for matching signs. Confirm the crop and issue with a qualified local advisor before treatment.';
   document.querySelector('#result-time').textContent = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 
   const probabilities = document.querySelector('#probability-list');
@@ -373,7 +409,7 @@ function renderHistory(items = readHistory()) {
     date.textContent = new Date(item.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
     info.append(title, date);
     const badge = document.createElement('span');
-    badge.className = `history-result${item.predictedClass === 'Potato___healthy' ? ' healthy' : ''}`;
+    badge.className = `history-result${isHealthyClass(item.predictedClass) ? ' healthy' : ''}`;
     badge.textContent = item.label || 'Leaf check';
     row.append(icon, info, badge);
     list.append(row);
